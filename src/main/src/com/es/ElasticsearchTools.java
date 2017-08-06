@@ -29,6 +29,7 @@ import org.elasticsearch.client.transport.TransportClient;
 import org.elasticsearch.common.settings.Settings;
 import org.elasticsearch.common.text.Text;
 import org.elasticsearch.common.transport.InetSocketTransportAddress;
+import org.elasticsearch.common.unit.TimeValue;
 import org.elasticsearch.common.xcontent.XContentBuilder;
 import org.elasticsearch.common.xcontent.XContentFactory;
 import org.elasticsearch.index.query.BoolQueryBuilder;
@@ -40,6 +41,7 @@ import org.elasticsearch.search.highlight.HighlightField;
 import org.elasticsearch.search.sort.SortBuilder;
 import org.elasticsearch.search.sort.SortBuilders;
 import org.elasticsearch.search.sort.SortOrder;
+import org.elasticsearch.search.sort.SortParseElement;
 import org.jboss.netty.util.internal.StringUtil;
 
 /**
@@ -54,27 +56,8 @@ public class ElasticsearchTools {
 
     private static Client client;
     static {
-        // 创建客户端, 使用的默认集群名, "elasticSearch"
-//        client = TransportClient.builder().build()
-//                .addTransportAddress(new InetSocketTransportAddress(InetAddress.getByName("www.wenbronk.com"), 9300));
-
-        // 通过setting对象指定集群配置信息, 配置的集群名
-        Settings settings = Settings.settingsBuilder().put("cluster.name", "elasticsearch_wenbronk") // 设置集群名
-//                .put("client.transport.sniff", true) // 开启嗅探 , 开启后会一直连接不上, 原因未知
-                .put("network.host", "192.168.50.37")
-                .put("client.transport.ignore_cluster_name", true) // 忽略集群名字验证, 打开后集群名字不对也能连接上
-//                .put("client.transport.nodes_sampler_interval", 5) //报错,
-//                .put("client.transport.ping_timeout", 5) // 报错, ping等待时间,
-                .build();
-        client = TransportClient.builder().settings(settings).build()
-                .addTransportAddress(new InetSocketTransportAddress(new InetSocketAddress("127.0.0.1", 9300)));
-        // 默认5s
-        // 多久打开连接, 默认5s
-        System.out.println("success connect");
+        client=ElasticsearchUtils.getClient();
     }
-
-
-
     /**
      *@Title: addIndex
      *@Description: TODO  单个索引增加
@@ -86,7 +69,6 @@ public class ElasticsearchTools {
      *@throws
      */
     public static void addDocument(JSONObject object, String index, String type, String id) {
-//            Client client = TransportClient.builder().build().addTransportAddress(new InetSocketTransportAddress(InetAddress.getByName(ip), port));
             IndexResponse response = client.prepareIndex(index, type, id).setSource(object).get();
     }
 
@@ -101,17 +83,9 @@ public class ElasticsearchTools {
      *@throws
      */
     public static Map<String, Object> getDocument(String index, String type, String id) {
-        try {
-            Client client = TransportClient.builder().build().addTransportAddress(new InetSocketTransportAddress(InetAddress.getByName(ip), port));
-            GetResponse response = client.prepareGet(index, type, id).get();
-            Map<String, Object> map = response.getSource();
-            return map;
-        } catch (UnknownHostException e) {
-            // TODO Auto-generated catch block
-            e.printStackTrace();
-        }
-        return null;
-
+        GetResponse response = client.prepareGet(index, type, id).get();
+        Map<String, Object> map = response.getSource();
+        return map;
     }
 
     /**
@@ -124,15 +98,7 @@ public class ElasticsearchTools {
      *@throws
      */
     public static void delDocument(String index, String type, String id) {
-        try {
-            Client client = TransportClient.builder().build().addTransportAddress(new InetSocketTransportAddress(InetAddress.getByName(ip), port));
-            DeleteResponse response = client.prepareDelete(index, type, id).get();
-
-        } catch (UnknownHostException e) {
-            // TODO Auto-generated catch block
-            e.printStackTrace();
-        }
-
+        DeleteResponse response = client.prepareDelete(index, type, id).get();
     }
 
     /**
@@ -146,7 +112,6 @@ public class ElasticsearchTools {
      */
     public static void updateDocument(String index, String type, String id, String key, String value) {
         try {
-            Client client = TransportClient.builder().build().addTransportAddress(new InetSocketTransportAddress(InetAddress.getByName(ip), port));
             UpdateRequest updateRequest = new UpdateRequest(index, type, id);
             updateRequest.doc(XContentFactory.jsonBuilder().startObject().field(key, value).endObject());
             client.update(updateRequest).get();
@@ -177,39 +142,28 @@ public class ElasticsearchTools {
      *@throws
      */
     public static List<Map<String, Object>> getDocuments(String index, String type, String id1, String id2) {
-        try {
-            Client client = TransportClient.builder().build().addTransportAddress(new InetSocketTransportAddress(InetAddress.getByName(ip), port));
-            //client.prepareMultiGet().add("twitter", "tweet", "1").add("twitter", "tweet", "2", "3", "4").add("another", "type", "foo").get();
-            MultiGetResponse multiGetItemResponses = client.prepareMultiGet().add(index, type, id1, id2).get();
-            List<Map<String, Object>> lists = new ArrayList<Map<String, Object>>();
-            for (MultiGetItemResponse itemResponse : multiGetItemResponses) {
-                GetResponse response = itemResponse.getResponse();
-                if (response.isExists()) {
-                    lists.add(response.getSource());
-                }
+        MultiGetResponse multiGetItemResponses = client.prepareMultiGet().add(index, type, id1, id2).get();
+        List<Map<String, Object>> lists = new ArrayList<Map<String, Object>>();
+        for (MultiGetItemResponse itemResponse : multiGetItemResponses) {
+            GetResponse response = itemResponse.getResponse();
+            if (response.isExists()) {
+                lists.add(response.getSource());
             }
-            return lists;
-        } catch (UnknownHostException e) {
-            // TODO Auto-generated catch block
-            e.printStackTrace();
         }
-        return null;
-
+        return lists;
     }
 
     /**
      *@Title: addDocuments  批量新增记录  注意 下面有个map.get(id) 也就是物理表的id
      *@Description: TODO
      *@param @param list
-     *@param @param index
-     *@param @param type
+     *@param @param index 库
+     *@param @param type 表
      *@return void
      *@throws
      */
     public static void addDocuments(List<Map<Object, Object>> list, String index, String type) {
         try {
-//            Client client = TransportClient.builder().build().addTransportAddress(new InetSocketTransportAddress(InetAddress.getByName(ip), port));
-
             BulkRequestBuilder bulkRequest = client.prepareBulk();
 
             for (Map<Object, Object> map : list) {
@@ -251,10 +205,13 @@ public class ElasticsearchTools {
      *@return List<Map<String,Object>>
      *@throws
      */
-    public static List<Map<String, Object>> queryDocuments(String index, String type, int from, int size, List<Map<Object, Object>> rangeLists, Map<Object, Object> queryMaps, Map<Object, Object> sortMaps, List<String> fields, Map<Object, Object> fullTextQueryMaps) {
+    public static List<Map<String, Object>> queryDocuments(String index, String type, int from, int size,
+                                                           List<Map<Object, Object>> rangeLists,
+                                                           Map<Object, Object> queryMaps,
+                                                           Map<Object, Object> sortMaps,
+                                                           List<String> fields,
+                                                           Map<Object, Object> fullTextQueryMaps) {
         try {
-//            Client client = TransportClient.builder().build().addTransportAddress(new InetSocketTransportAddress(InetAddress.getByName(ip), port));
-
             List<Map<String, Object>> lists = new ArrayList<Map<String, Object>>();
             /** 下面这一段是构造bool嵌套，就是构造一个在满足精确查找的条件下，再去进行多字段的或者关系的全文检索 **/
             //构造全文或关系的查询
@@ -355,6 +312,29 @@ public class ElasticsearchTools {
             e.printStackTrace();
         }
         return null;
+
+    }
+
+    public static void testScrolls() {
+        QueryBuilder queryBuilder = QueryBuilders.termQuery("member", "user");
+
+        SearchResponse response = client.prepareSearch()
+                .addSort(SortParseElement.DOC_FIELD_NAME, SortOrder.ASC)
+                .setScroll(new TimeValue(60000))
+                .setQuery(queryBuilder)
+                .setSize(100).execute().actionGet();
+
+        while(true) {
+            for (SearchHit hit : response.getHits().getHits()) {
+                System.out.println("i am coming");
+            }
+            SearchResponse response2 = client.prepareSearchScroll(response.getScrollId())
+                    .setScroll(new TimeValue(60000)).execute().actionGet();
+            if (response2.getHits().getHits().length == 0) {
+                System.out.println("oh no=====");
+                break;
+            }
+        }
 
     }
 

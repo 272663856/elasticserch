@@ -4,19 +4,20 @@ import org.elasticsearch.client.Client;
 import org.elasticsearch.client.transport.TransportClient;
 import org.elasticsearch.common.settings.Settings;
 import org.elasticsearch.common.transport.InetSocketTransportAddress;
-import org.junit.Test;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.net.InetSocketAddress;
 
 public class ElasticsearchUtils {
-
-    private Client client;
-
-    public ElasticsearchUtils(String clusterName, String ipAddress) {
-        // 创建客户端, 使用的默认集群名, "elasticSearch"
-//        client = TransportClient.builder().build()
-//                .addTransportAddress(new InetSocketTransportAddress(InetAddress.getByName("www.wenbronk.com"), 9300));
-
+    /*客户端*/
+    private final static Client client;
+    /*ip地址*/
+    private final static String ip="localhost";
+    /*端口号*/
+    private final static int port=9300;
+    private final static Logger logger = LoggerFactory.getLogger(ElasticsearchUtils.class);
+    static {
         // 通过setting对象指定集群配置信息, 配置的集群名
         Settings settings = Settings.settingsBuilder().put("cluster.name", "elasticsearch_wenbronk") // 设置集群名
 //                .put("client.transport.sniff", true) // 开启嗅探 , 开启后会一直连接不上, 原因未知
@@ -26,9 +27,13 @@ public class ElasticsearchUtils {
 //                .put("client.transport.ping_timeout", 5) // 报错, ping等待时间,
                 .build();
         client = TransportClient.builder().settings(settings).build()
-                .addTransportAddress(new InetSocketTransportAddress(new InetSocketAddress("127.0.0.1", 9300)));
+                .addTransportAddress(new InetSocketTransportAddress(new InetSocketAddress(ip, port)));
         // 默认5s
         // 多久打开连接, 默认5s
-        System.out.println("success connect");
+        logger.info("************************success connect*********************************");
+    }
+
+    public static Client getClient(){
+        return client;
     }
 }
